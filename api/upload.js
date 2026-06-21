@@ -1,6 +1,7 @@
 // api/upload.js
-// Uploads an image (base64 data URL) to Vercel Blob and returns its public URL.
-// Used for coach photo and site logo uploads from the admin panel.
+// Uploads an image (base64 data URL) to a private Vercel Blob store.
+// Returns a URL served through /api/image (since private blobs cannot
+// be fetched directly by the browser).
 
 const { put } = require('@vercel/blob');
 
@@ -40,12 +41,15 @@ module.exports = async (req, res) => {
     const buffer = Buffer.from(base64Data, 'base64');
 
     const blob = await put(filename, buffer, {
-      access: 'public',
+      access: 'private',
       contentType,
-      allowOverwrite: true
+      allowOverwrite: true,
+      addRandomSuffix: false
     });
 
-    res.status(200).json({ ok: true, url: blob.url });
+    // Public-facing URL goes through our own image-serving endpoint,
+    // since private blobs require authentication to fetch directly.
+    res.status(200).json({ ok: true, url: '/api/image?name=' + encodeURIComponent(filename) });
   } catch (err) {
     console.error('Upload error:', err);
     res.status(500).json({ ok: false, error: err.message });
