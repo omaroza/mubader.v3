@@ -758,7 +758,7 @@ let SITE_DATA = null;
 
 async function loadSiteData(){
   try{
-    const res = await fetch('/api/data');
+    const res = await fetch('/api/data', { cache: 'no-store' });
     SITE_DATA = await res.json();
   }catch(err){
     console.error('Failed to load site data, using fallback', err);
