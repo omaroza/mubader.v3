@@ -51,8 +51,12 @@ async function getCurrentData() {
   try {
     const { blobs } = await list({ prefix: DATA_FILENAME });
     if (blobs.length === 0) return DEFAULT_DATA;
-    const blob = blobs[0];
-    const res = await fetch(blob.url);
+    // If multiple blobs share the prefix (can happen with Vercel Blob's
+    // versioning), always pick the most recently uploaded one.
+    const blob = blobs.reduce((latest, b) =>
+      new Date(b.uploadedAt) > new Date(latest.uploadedAt) ? b : latest
+    , blobs[0]);
+    const res = await fetch(blob.url, { cache: 'no-store' });
     if (!res.ok) return DEFAULT_DATA;
     const json = await res.json();
     return { ...DEFAULT_DATA, ...json };
@@ -66,7 +70,8 @@ async function saveData(data) {
   await put(DATA_FILENAME, JSON.stringify(data), {
     access: 'public',
     contentType: 'application/json',
-    allowOverwrite: true
+    allowOverwrite: true,
+    addRandomSuffix: false
   });
 }
 
