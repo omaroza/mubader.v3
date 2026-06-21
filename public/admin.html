@@ -815,6 +815,7 @@ const DB = {
     saveTimer = setTimeout(() => DB.flush(), 500);
   },
   async flush() {
+    clearTimeout(saveTimer);
     try {
       const res = await fetch('/api/data', {
         method: 'POST',
@@ -1273,7 +1274,7 @@ function openProductModal(id) {
   document.getElementById('product-modal').classList.add('open');
 }
 
-function saveProduct(id) {
+async function saveProduct(id) {
   const products = DB.get('products', DEFAULT_PRODUCTS);
   const data = {
     name: document.getElementById('pm-name').value.trim(),
@@ -1301,7 +1302,10 @@ function saveProduct(id) {
     data.id = 'w' + Date.now();
     products.push(data);
   }
-  DB.set('products', products);
+  SITE_DATA.products = products;
+  clearTimeout(saveTimer);
+  showToast('جاري الحفظ...');
+  await DB.flush();
   closeModal('product-modal');
   renderProductsAdmin();
   showToast(id ? 'تم الحفظ ✓' : 'تم إضافة الورشة ✓');
@@ -1346,7 +1350,7 @@ function openTestimonialModal(id) {
   document.getElementById('testimonial-modal').classList.add('open');
 }
 
-function saveTestimonial(id) {
+async function saveTestimonial(id) {
   const ts = DB.get('testimonials', []);
   const data = {
     name: document.getElementById('tm-name').value.trim(),
@@ -1356,7 +1360,8 @@ function saveTestimonial(id) {
   };
   if (id) { const idx = ts.findIndex(t => t.id === id); if (idx >= 0) ts[idx] = { ...ts[idx], ...data }; }
   else { data.id = 't' + Date.now(); ts.push(data); }
-  DB.set('testimonials', ts);
+  SITE_DATA.testimonials = ts;
+  await DB.flush();
   closeModal('testimonial-modal');
   renderTestimonialsAdmin();
   showToast('تم الحفظ ✓');
@@ -1404,12 +1409,13 @@ function openFaqModal(id) {
   document.getElementById('faq-modal').classList.add('open');
 }
 
-function saveFaq(id) {
+async function saveFaq(id) {
   const faqs = DB.get('faqs', []);
   const data = { q: document.getElementById('fm-q').value.trim(), a: document.getElementById('fm-a').value.trim() };
   if (id) { const idx = faqs.findIndex(f => f.id === id); if (idx >= 0) faqs[idx] = { ...faqs[idx], ...data }; }
   else { data.id = 'f' + Date.now(); faqs.push(data); }
-  DB.set('faqs', faqs);
+  SITE_DATA.faqs = faqs;
+  await DB.flush();
   closeModal('faq-modal');
   renderFaqsAdmin();
   showToast('تم الحفظ ✓');
@@ -1442,6 +1448,18 @@ function showToast(msg) {
 ═══════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', function() {
   checkAuth();
+});
+
+// Safety net: if there's a pending save when the page is about to close
+// (e.g. user navigates away right after a quick toggle/delete action),
+// force it through immediately using sendBeacon so it isn't lost.
+window.addEventListener('beforeunload', function() {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    try {
+      navigator.sendBeacon('/api/data', new Blob([JSON.stringify(SITE_DATA)], { type: 'application/json' }));
+    } catch (e) { /* best effort */ }
+  }
 });
 </script>
 </body>
